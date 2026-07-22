@@ -134,6 +134,11 @@ function buildServer() {
           )
           .min(1),
       },
+      _meta: {
+        "openai/outputTemplate": WIDGET_URI,
+        "openai/toolInvocation/invoking": "Drafting the report",
+        "openai/toolInvocation/invoked": "Drafted the report",
+      },
     },
     async ({ title, sections }) => {
       currentReport = touch({
@@ -172,6 +177,11 @@ function buildServer() {
             })
           )
           .optional(),
+      },
+      _meta: {
+        "openai/outputTemplate": WIDGET_URI,
+        "openai/toolInvocation/invoking": "Updating the section",
+        "openai/toolInvocation/invoked": "Updated the section",
       },
     },
     async ({ sectionIndex, heading, body, citations }) => {
