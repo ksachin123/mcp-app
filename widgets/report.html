@@ -1,0 +1,320 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8" />
+<style>
+  :root {
+    color-scheme: light dark;
+    --ink: #1c1d1f;
+    --ink-soft: #55585e;
+    --rule: #d9dce1;
+    --paper: #ffffff;
+    --accent: #1f4b3f;
+    --accent-soft: #eaf1ee;
+    --mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+    --serif: "Source Serif 4", Georgia, "Times New Roman", serif;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --ink: #eceef0;
+      --ink-soft: #a7abb3;
+      --rule: #33363c;
+      --paper: #17181a;
+      --accent: #7fd8b8;
+      --accent-soft: #1d2b26;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: 14px;
+    line-height: 1.55;
+  }
+  .wrap { padding: 16px 18px 22px; max-width: 720px; }
+  .masthead {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    border-bottom: 2px solid var(--ink);
+    padding-bottom: 8px;
+    margin-bottom: 14px;
+  }
+  .masthead h1 {
+    font-family: var(--serif);
+    font-size: 19px;
+    font-weight: 600;
+    margin: 0;
+    letter-spacing: -0.01em;
+  }
+  .masthead .tag {
+    font-family: var(--mono);
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--ink-soft);
+  }
+  .section { margin-bottom: 18px; }
+  .section h2 {
+    font-family: var(--serif);
+    font-size: 14.5px;
+    font-weight: 600;
+    margin: 0 0 6px;
+    color: var(--ink);
+  }
+  .section .body {
+    outline: none;
+    border-radius: 6px;
+    padding: 2px 4px;
+    margin: -2px -4px;
+  }
+  .section .body[contenteditable="true"] {
+    background: var(--accent-soft);
+    box-shadow: 0 0 0 1px var(--rule) inset;
+  }
+  sup.cite {
+    cursor: pointer;
+    color: var(--accent);
+    font-weight: 700;
+    padding: 0 1px;
+  }
+  sup.cite:hover { text-decoration: underline; }
+  .toolbar {
+    display: flex;
+    gap: 6px;
+    margin-top: 6px;
+  }
+  button.chip {
+    font-family: var(--sans);
+    font-size: 11px;
+    border: 1px solid var(--rule);
+    background: transparent;
+    color: var(--ink-soft);
+    border-radius: 999px;
+    padding: 3px 10px;
+    cursor: pointer;
+  }
+  button.chip:hover { border-color: var(--ink-soft); color: var(--ink); }
+  .source-card {
+    margin-top: 8px;
+    padding: 8px 10px;
+    border: 1px solid var(--rule);
+    border-left: 3px solid var(--accent);
+    border-radius: 4px;
+    background: var(--accent-soft);
+    font-size: 12.5px;
+  }
+  .source-card .src-title { font-weight: 600; margin-bottom: 2px; }
+  .source-card .src-meta {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    color: var(--ink-soft);
+    margin-bottom: 4px;
+  }
+  .footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-top: 1px solid var(--rule);
+    padding-top: 8px;
+    margin-top: 4px;
+  }
+  .footer .status {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    color: var(--ink-soft);
+  }
+  .refine-box {
+    display: none;
+    gap: 6px;
+    margin-top: 6px;
+  }
+  .refine-box.open { display: flex; }
+  .refine-box input {
+    flex: 1;
+    font-size: 12px;
+    padding: 5px 8px;
+    border: 1px solid var(--rule);
+    border-radius: 4px;
+    background: var(--paper);
+    color: var(--ink);
+  }
+  .refine-box button {
+    font-size: 11px;
+    border: none;
+    background: var(--ink);
+    color: var(--paper);
+    border-radius: 4px;
+    padding: 5px 10px;
+    cursor: pointer;
+  }
+  .empty {
+    color: var(--ink-soft);
+    font-size: 13px;
+    padding: 20px 0;
+  }
+</style>
+</head>
+<body>
+  <div class="wrap" id="root">
+    <div class="empty">Waiting for a draft… ask the analyst assistant to draft a topic.</div>
+  </div>
+
+<script>
+(function () {
+  const root = document.getElementById("root");
+
+  function getState() {
+    return (window.openai && window.openai.toolOutput) || (window.openai && window.openai.widgetState) || null;
+  }
+
+  function escapeHtml(str) {
+    return String(str || "").replace(/[&<>"]/g, (c) => (
+      { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]
+    ));
+  }
+
+  function sourceBadge(sourceType) {
+    const labels = { internal_repo: "Internal", market_data: "Market data", web: "Web" };
+    return labels[sourceType] || sourceType;
+  }
+
+  function render(report) {
+    if (!report || !report.sections || !report.sections.length) {
+      root.innerHTML = '<div class="empty">Waiting for a draft… ask the analyst assistant to draft a topic.</div>';
+      return;
+    }
+
+    const sectionsHtml = report.sections.map((s, i) => {
+      const bodyWithMarkers = (s.body || "").replace(/\[(\d+)\]/g, (m, n) => {
+        const c = (s.citations || []).find((c) => String(c.marker) === n);
+        return '<sup class="cite" data-section="' + i + '" data-marker="' + n + '">[' + n + "]</sup>";
+      });
+      return (
+        '<div class="section" data-index="' + i + '">' +
+          "<h2>" + escapeHtml(s.heading) + "</h2>" +
+          '<div class="body" contenteditable="false" data-index="' + i + '">' + bodyWithMarkers + "</div>" +
+          '<div class="toolbar">' +
+            '<button class="chip edit-btn" data-index="' + i + '">Edit text</button>' +
+            '<button class="chip refine-toggle" data-index="' + i + '">Ask AI to refine</button>' +
+          "</div>" +
+          '<div class="refine-box" data-index="' + i + '">' +
+            '<input type="text" placeholder="e.g. tighten this, add the bear case…" />' +
+            "<button>Send</button>" +
+          "</div>" +
+          '<div class="source-slot" data-index="' + i + '"></div>' +
+        "</div>"
+      );
+    }).join("");
+
+    root.innerHTML =
+      '<div class="masthead"><h1>' + escapeHtml(report.title || "Untitled draft") + '</h1>' +
+        '<span class="tag">v' + (report.version || 1) + "</span></div>" +
+      sectionsHtml +
+      '<div class="footer">' +
+        '<span class="status">' + report.sections.reduce((n, s) => n + (s.citations || []).length, 0) + " citations · last updated " + (report.updatedAt || "just now") + "</span>" +
+        '<button class="chip export-btn">Export draft</button>' +
+      "</div>";
+
+    attachHandlers(report);
+  }
+
+  function attachHandlers(report) {
+    root.querySelectorAll(".cite").forEach((el) => {
+      el.addEventListener("click", () => {
+        const idx = Number(el.dataset.section);
+        const marker = el.dataset.marker;
+        const section = report.sections[idx];
+        const citation = (section.citations || []).find((c) => String(c.marker) === marker);
+        const slot = root.querySelector('.source-slot[data-index="' + idx + '"]');
+        if (!citation) return;
+        slot.innerHTML =
+          '<div class="source-card">' +
+            '<div class="src-title">[' + marker + "] " + escapeHtml(citation.title) + "</div>" +
+            '<div class="src-meta">' + sourceBadge(citation.sourceType) + " · " + escapeHtml(citation.ref) + "</div>" +
+            "<div>" + escapeHtml(citation.snippet) + "</div>" +
+          "</div>";
+      });
+    });
+
+    root.querySelectorAll(".edit-btn").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const idx = btn.dataset.index;
+        const body = root.querySelector('.body[data-index="' + idx + '"]');
+        const editing = body.getAttribute("contenteditable") === "true";
+        body.setAttribute("contenteditable", editing ? "false" : "true");
+        btn.textContent = editing ? "Edit text" : "Done editing";
+        if (editing) {
+          const newText = body.innerText;
+          report.sections[idx].body = newText;
+          report.sections[idx].manuallyEdited = true;
+          if (window.openai && window.openai.setWidgetState) {
+            window.openai.setWidgetState(report);
+          }
+          if (window.openai && window.openai.callTool) {
+            window.openai.callTool("update_section", {
+              sectionIndex: Number(idx),
+              body: newText,
+            });
+          }
+        }
+      });
+    });
+
+    root.querySelectorAll(".refine-toggle").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const idx = btn.dataset.index;
+        const box = root.querySelector('.refine-box[data-index="' + idx + '"]');
+        box.classList.toggle("open");
+      });
+    });
+
+    root.querySelectorAll(".refine-box").forEach((box) => {
+      const send = box.querySelector("button");
+      const input = box.querySelector("input");
+      send.addEventListener("click", () => {
+        const idx = box.dataset.index;
+        const instruction = input.value.trim();
+        if (!instruction) return;
+        const heading = report.sections[idx].heading;
+        if (window.openai && window.openai.sendFollowUpMessage) {
+          window.openai.sendFollowUpMessage({
+            prompt:
+              'Refine the "' + heading + '" section (section index ' + idx + ") of the current draft: " + instruction +
+              ". Keep existing citations that are still accurate, add new ones from search_sources if needed, and call update_section when done.",
+          });
+        }
+        input.value = "";
+        box.classList.remove("open");
+      });
+    });
+
+    const exportBtn = root.querySelector(".export-btn");
+    if (exportBtn) {
+      exportBtn.addEventListener("click", () => {
+        if (window.openai && window.openai.callTool) {
+          window.openai.callTool("export_report", {});
+        }
+      });
+    }
+  }
+
+  function boot() {
+    const data = getState();
+    render(data);
+  }
+
+  if (window.openai) {
+    window.openai.addEventListener &&
+      window.openai.addEventListener("openai:set_globals", boot);
+    // Some hosts deliver initial data slightly after script load.
+    setTimeout(boot, 0);
+  }
+  boot();
+})();
+</script>
+</body>
+</html>

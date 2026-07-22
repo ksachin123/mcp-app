@@ -1,0 +1,13 @@
+{
+  "name": "authoring-mcp-app",
+  "version": "1.0.0",
+  "description": "Prototype MCP app for sell-side authoring in ChatGPT",
+  "main": "server.js",
+  "type": "module",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC"
+}
